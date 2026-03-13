@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ploiești Base - PTW Zone Tracker</title>
+    <style>
+        :root {
+            --color-background: #fcfcf9;
+            --color-surface: #fffffe;
+            --color-text: #13343b;
+            --color-text-secondary: #626c71;
+            --color-primary: #21808d;
+            --color-primary-hover: #1d7480;
+            --color-border: rgba(94, 82, 64, 0.2);
+            --color-error: #c0152f;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--color-background);
+            color: var(--color-text);
+            padding: 20px;
+        }
+
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; }
+        .header p { color: var(--color-text-secondary); font-size: 14px; }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+            flex-wrap: wrap;
+        }
+
+        .control-panel {
+            flex: 0 0 320px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            padding: 20px;
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+
+        .control-panel h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+
+        .zone-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .zone-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--color-surface);
+        }
+        .zone-item:hover { background: rgba(33, 128, 141, 0.08); }
+
+        .zone-item.active {
+            background: rgba(192, 21, 47, 0.08);
+            border-color: var(--color-error);
+            animation: pulse-red 1s infinite;
+        }
+
+        .zone-checkbox {
+            margin-right: 12px;
+            width: 18px;
+            height: 18px;
+            accent-color: var(--color-error);
+        }
+
+        .zone-label { flex: 1; font-size: 14px; }
+
+        .status-badge {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.active {
+            background: rgba(192, 21, 47, 0.15);
+            color: var(--color-error);
+        }
+
+        .map-container {
+            flex: 1;
+            min-width: 600px;
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .map-wrapper {
+            position: relative;
+            width: 100%;
+            overflow: auto;
+            border-radius: 8px;
+        }
+
+        /* Harta nouă */
+        #map-inner {
+            position: relative;
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        #base-map {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        /* zonele peste PNG */
+        .map-zone {
+            position: absolute;
+            border: 2px solid transparent;
+            box-sizing: border-box;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        .map-zone.pulse {
+            border-color: var(--color-error);
+            animation: pulse-red 1s infinite;
+        }
+
+        @keyframes pulse-red {
+            0%   { box-shadow: 0 0 0 0 rgba(192,21,47,0.7); }
+            70%  { box-shadow: 0 0 0 10px rgba(192,21,47,0); }
+            100% { box-shadow: 0 0 0 0 rgba(192,21,47,0); }
+        }
+
+        .stats {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            flex: 1;
+            padding: 12px;
+            background: rgba(33, 128, 141, 0.08);
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--color-primary);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            margin-top: 4px;
+        }
+
+        .legend {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--color-border);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .legend-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 8px;
+        }
+
+        .legend-active {
+            background: rgba(192, 21, 47, 0.3);
+            border: 2px solid var(--color-error);
+            animation: pulse-red 1.5s infinite;
+        }
+
+        .legend-inactive {
+            background: transparent;
+            border: 2px solid var(--color-border);
+        }
+
+        @media (max-width: 1024px) {
+            .container { flex-direction: column; }
+            .control-panel { flex: 1; position: static; }
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>🏭 SLB Ploiesti OFS Base - PTW Zone Tracker</h1>
+    <p>Click on the working zones of side panel to highlight the PTW on the map</p>
+</div>
+
+<div class="container">
+    <div class="control-panel">
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="activeCount">0</div>
+                <div class="stat-label">Active Permit(s)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalZones">0</div>
+                <div class="stat-label">Total Zones</div>
+            </div>
+        </div>
+
+        <h2>Working Zone(s)</h2>
+        <div class="zone-list" id="zoneList"></div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-box legend-active"></div>
+                <span>Active Permit(s)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box legend-inactive"></div>
+                <span>No Active Permit(s)</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="map-container">
+        <div class="map-wrapper">
+            <div id="map-inner">
+                <!-- HARTA NOUĂ -->
+                <img id="base-map"
+                     src="base-layout.jpg"
+                     alt="Ploiești Base layout nou">
+
+                <!-- RECTANGHIILE pentru zone (coordonate procentuale) -->
+                <!-- B1 -->
+                <div class="map-zone" id="zone-b1_yard_north"
+                     style="left:19%; top:20%; width:31%; height:4%;"></div>
+
+                <div class="map-zone" id="zone-b2_yard_north"
+                     style="left:51%; top:20%; width:36%; height:4%;"></div>
+
+                <div class="map-zone" id="zone-b1_canopy_north"
+                     style="left:19%; top:26%; width:29.5%; height:4%;"></div>
+
+                <div class="map-zone" id="zone-b1_workshop_msp"
+                     style="left:19%; top:29%; width:6%; height:11%;"></div>
+
+                <div class="map-zone" id="zone-b1_workshop_prs"
+                     style="left:25%; top:29%; width:12%; height:11%;"></div>
+
+                <div class="map-zone" id="zone-b1_wec_north"
+                     style="left:37%; top:29%; width:11%; height:10%;"></div>
+
+                <div class="map-zone" id="zone-b1_msp_lab"
+                     style="left:23%; top:40%; width:5%; height:7.5%;"></div>
+
+                <div class="map-zone" id="zone-b1_fluids_mi"
+                     style="left:32%; top:40%; width:3%; height:7%;"></div>
+
+                <div class="map-zone" id="zone-b1_fluids_ws"
+                     style="left:28%; top:40%; width:4%; height:7%;"></div>
+
+                <!-- ZONĂ NOUĂ: B1 WCM MIDDLE -->
+                <div class="map-zone" id="zone-b1_wcm_middle"
+                     style="left:37%; top:40%; width:2%; height:7%;"></div>
+
+                <div class="map-zone" id="zone-b1_wcm_lab"
+                     style="left:38.6%; top:40%; width:4%; height:7%;"></div>
+
+                <div class="map-zone" id="zone-b1_wec_south"
+                     style="left:23%; top:48%; width:25.3%; height:9.5%;"></div>
+
+                <div class="map-zone" id="zone-b1_canopy_south"
+                     style="left:23%; top:57.5%; width:25%; height:3%;"></div>
+
+                <div class="map-zone" id="zone-b1_offices"
+                     style="left:32%; top:70%; width:12%; height:4%;"></div>
+
+                <!-- PARKING & ALTELE -->
+                <div class="map-zone" id="zone-lv_parking"
+                     style="left:3%; top:24%; width:15%; height:37%;"></div>
+
+                <!-- B2 -->
+                <div class="map-zone" id="zone-b2_canopy_north"
+                     style="left:53%; top:33%; width:20%; height:2%;"></div>
+
+                <div class="map-zone" id="zone-b2_workshop_ptb"
+                     style="left:53%; top:35%; width:3%; height:9%;"></div>
+
+                <div class="map-zone" id="zone-b2_maintenance"
+                     style="left:59%; top:35%; width:7%; height:9%;"></div>
+
+                <div class="map-zone" id="zone-b2_rpf_storage"
+                     style="left:66%; top:35%; width:7%; height:9%;"></div>
+
+                <div class="map-zone" id="zone-b2_canopy_south"
+                     style="left:53%; top:44%; width:20%; height:2%;"></div>
+
+                <div class="map-zone" id="zone-b2_test_storage"
+                     style="left:73%; top:31%; width:5%; height:14%;"></div>
+
+                <div class="map-zone" id="zone-hv_parking"
+                     style="left:81%; top:28%; width:4%; height:24%;"></div>
+
+                <!-- B3 (radiation) -->
+                <div class="map-zone" id="zone-b3_radiation_wles"
+                     style="left:73%; top:56%; width:5%; height:6%;"></div>
+
+                <div class="map-zone" id="zone-b3_radiation_wec"
+                     style="left:68%; top:56%; width:5%; height:6%;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Lista zonelor – denumiri EXACT ca pe hartă
+    const zones = [
+        { id: 'b1_yard_north',  name: 'B1 YARD NORTH STORAGE' },
+        { id: 'b2_yard_north',  name: 'B2 YARD NORTH STORAGE' },
+
+        { id: 'b1_canopy_north',   name: 'B1 CANOPY NORTH STORAGE' },
+        { id: 'b1_workshop_msp',   name: 'B1 Workshop MSP North Storage' },
+        { id: 'b1_workshop_prs',   name: 'B1 Workshop PRS North' },
+        { id: 'b1_wec_north',      name: 'B1 Workshop WEC North (MI & Bits D&M)' },
+
+        { id: 'b1_msp_lab',    name: 'B1 MSP (ex-WL LAB)' },
+        { id: 'b1_fluids_mi',  name: 'B1 FLUIDS LAB MI / PCT' },
+        { id: 'b1_fluids_ws',  name: 'B1 FLUIDS LAB WS' },
+
+        { id: 'b1_wcm_middle', name: 'B1 WCM MIDDLE' },
+        { id: 'b1_wcm_lab',    name: 'B1 WCM LAB' },
+
+        { id: 'b1_wec_south',  name: 'B1 Workshop WEC South' },
+        { id: 'b1_canopy_south', name: 'B1 CANOPY SOUTH STORAGE' },
+        { id: 'b1_offices',    name: 'B1 OPEN SPACE & OFFICE AREA' },
+
+        { id: 'lv_parking',    name: 'LV Parking area' },
+
+        { id: 'b2_canopy_north',   name: 'B2 CANOPY NORTH STORAGE' },
+        { id: 'b2_workshop_ptb',   name: 'B2 WORKSHOP PTB & STD' },
+        { id: 'b2_maintenance',    name: 'MAINTENANCE WORKSHOP' },
+        { id: 'b2_rpf_storage',    name: 'B2 WORKSHOP RPF STORAGE' },
+        { id: 'b2_canopy_south',   name: 'B2 CANOPY SOUTH STORAGE' },
+        { id: 'b2_test_storage',   name: 'B2 TENT STORAGE' },
+        { id: 'hv_parking',        name: 'HV Parking area' },
+
+        { id: 'b3_radiation_wles', name: 'B3 RADIATION EXAMINATION (WLES)' },
+        { id: 'b3_radiation_wec',  name: 'B3 RADIATION EXAMINATION (WEC)' },
+    ];
+
+    let activeZones = new Set();
+
+    function initializeApp() {
+        const zoneList = document.getElementById('zoneList');
+
+        zones.forEach(zone => {
+            const item = document.createElement('div');
+            item.className = 'zone-item';
+            item.dataset.zoneId = zone.id;
+            item.innerHTML = `
+                <input type="checkbox" class="zone-checkbox" id="check_${zone.id}">
+                <label class="zone-label" for="check_${zone.id}">${zone.name}</label>
+                <span class="status-badge" id="badge_${zone.id}"></span>
+            `;
+
+            item.addEventListener('click', (e) => {
+                if (e.target.type !== 'checkbox') toggleZone(zone.id);
+            });
+
+            item.querySelector('.zone-checkbox')
+                .addEventListener('change', () => toggleZone(zone.id));
+
+            zoneList.appendChild(item);
+
+            const mapZone = document.getElementById('zone-' + zone.id);
+            if (mapZone) {
+                mapZone.addEventListener('click', () => toggleZone(zone.id));
+            }
+        });
+
+        document.getElementById('totalZones').textContent = zones.length;
+    }
+
+    function toggleZone(zoneId) {
+        if (activeZones.has(zoneId)) {
+            activeZones.delete(zoneId);
+        } else {
+            activeZones.add(zoneId);
+        }
+        updateUI(zoneId);
+        document.getElementById('activeCount').textContent = activeZones.size;
+    }
+
+    function updateUI(zoneId) {
+        const isActive = activeZones.has(zoneId);
+
+        const mapZone = document.getElementById('zone-' + zoneId);
+        if (mapZone) {
+            mapZone.classList.toggle('pulse', isActive);
+        }
+
+        const item = document.querySelector(`.zone-item[data-zone-id="${zoneId}"]`);
+        const checkbox = document.getElementById(`check_${zoneId}`);
+        const badge = document.getElementById(`badge_${zoneId}`);
+
+        if (item && checkbox && badge) {
+            checkbox.checked = isActive;
+            item.classList.toggle('active', isActive);
+            badge.textContent = isActive ? 'ACTIVE' : '';
+            badge.className = isActive ? 'status-badge active' : 'status-badge';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', initializeApp);
+</script>
+</body>
+</html>
